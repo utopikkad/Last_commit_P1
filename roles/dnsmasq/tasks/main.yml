@@ -1,0 +1,34 @@
+--- 
+- name: "Update to latest DHCP"
+  apt: 
+    name: dnsmasq
+    state: latest
+
+- name: "Copy the DHCP config"
+  template:
+    src: dnsmasq.conf.j2
+    dest: /etc/dnsmasq.conf
+  notify:
+    - "restart dnsmasq"
+- name: deploy resol.conf template
+  template:
+    src: resolv.conf.j2
+    dest: /etc/resolv.conf
+    owner: root
+    group: root
+    mode: 0644
+
+    #- name: Add a line to a file if the file does not exist, without passing regexp
+    #  lineinfile:
+    #    path: /etc/network/interfaces.d/eth1
+    #    #    state: touch
+    #    create: yes
+    #    line: iface eth1 inet dhcp
+    #  tags:
+    #    - client
+    #
+    #- name: dhclient
+    #  shell:
+    #    cmd: dhclient -v eth1
+    #  tags:
+    #     - client

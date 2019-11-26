@@ -1,0 +1,78 @@
+# roles/wordpress/tasks/config.yml
+# Configures Wordpress
+---
+#- name: Create a NFS directory 
+#  file:
+#    path: /export/NFS
+#    state: directory
+#    mode: '0755'
+#
+#- name: mount the nfsshare in client side
+#  mount:
+#    fstype: nfs
+#    opts: defaults
+#    dump: 0
+#    passno: 0
+#    state: mounted
+#    src: s4.infra:/export/DATA 
+#    path: /var/www/
+#
+- name: Enable required apache modules
+  apache2_module:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - expires
+    - headers
+    - http2
+    - rewrite
+    - ssl
+
+- name: Create Virtualhost configuration
+  become: yes
+  template:
+    src: "{{ item }}.com.j2"
+    dest: "/etc/apache2/sites-available/{{ item }}.com.conf"
+    owner: www-data
+    group: www-data
+  with_items: 
+    - devops
+    - devsec
+    - devsecops
+
+- name: Add mappings to /etc/hosts
+  become: yes
+  blockinfile:
+    path: /etc/hosts
+    block: |
+      {{ item.ip }} {{ item.name }}
+    marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item.name }}"
+  loop:
+    - { name: devops.com, ip: 127.0.0.1 }
+    - { name: devsec.com, ip: 127.0.0.1 }
+    - { name: devsecops.com, ip: 127.0.0.1 }      
+
+- name: Enable site
+  become: yes
+  command: "a2ensite {{ item }}.com" 
+  with_items: 
+    - devops
+    - devsec
+    - devsecops
+
+
+- name:
+  template: 
+    src: "{{ item.src }}" 
+    dest: "{{ item.dest }}" 
+  with_items:
+  - { src: wp-config.1.php, dest: /var/www/devops/wordpress }
+  - { src: wp-config.2.php, dest: /var/www/devsec/wordpress }
+  - { src: wp-config.3.php, dest: /var/www/devsecops/wordpress }
+
+
+- name: Restart apache
+  become: yes
+  service:
+   name: apache2
+   state: restarted

@@ -1,0 +1,96 @@
+---
+- name: Configure "mariadb"
+  template:
+    src: my.cnf.j2
+    dest: "{{ item }}" 
+    owner: root
+    group: root
+    mode: '0644'
+  with_items:
+    - /root/.my.cnf 
+  notify:
+    - restart mariadb
+
+- name: Configure "mariadb"
+  template:
+    src: my.cnf2.j2
+    dest: "{{ item }}" 
+    owner: root
+    group: root
+    mode: '0644'
+  with_items:
+    - /etc/mysql/my.cnf
+  notify:
+    - restart mariadb
+
+- name: Install dependencies 1/2
+  apt:
+    name: 
+      - python-pip
+      - python-pymysql 
+      - python-setuptools
+
+- name: Install dependencies 2/2
+  pip:
+    name: PyMySQL
+
+- name: create export "DATA" folders
+  file:
+    path: "{{ item }}"
+    mode: '0755'
+    state: directory
+  loop:
+    - /export/DATA
+
+
+- name: Check if a custom root password is specified
+  debug:
+    msg: >
+      Warning!! the MariaDB root password was left empty. Please set a custom
+      password with role variable mariadb_root_password to secure your database
+      server!
+  when: mariadb_root_password | length == 0
+
+# This command will fail when the root password was set previously
+- name: Check if root password is set
+  shell: >
+    mysqladmin -u root status
+  changed_when: false
+  failed_when: false
+  register: root_pwd_check
+  tags: mariadb
+
+- name: Set MariaDB root password for the first time (root@localhost)
+  mysql_user:
+    name: root
+    password: admin
+    host: localhost
+    state: present
+    login_user: root
+    login_password: "admin"
+    #    login_unix_socket: 
+  when: root_pwd_check.rc == 0
+  tags: mariadb
+
+- name: Create "wordpress" DB
+  mysql_db:
+    name: "{{ item }}"
+    state: present
+    login_user: root
+    login_password: ""
+  with_items:
+    - wordpress1
+    - wordpress2
+    - wordpress3
+
+- name: Create database user  
+  mysql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password  }}"
+    host: "%"
+    priv: '*.*:ALL'
+    state: present
+  with_items:  
+    - { name: "wordpress1", password: "wordpress1"  }
+    - { name: "wordpress2", password: "wordpress2"  }
+    - { name: "wordpress3", password: "wordpress3"  }
